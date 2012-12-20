@@ -92,6 +92,10 @@ class FNNDSC_hypothermia(base.FNNDSC):
             'action'        : 'attempting to load the ASL volume, ',
             'error'         : 'no file was found.',
             'exitCode'      : 16},
+        'stageExec'         : {
+            'action'        : 'executing stage, ',
+            'error'         : 'an external error was detected.',
+            'exitCode'      : 30},
         'Load'              : {
             'action'        : 'attempting to pickle load object, ',
             'error'         : 'a PickleError occured.',
@@ -131,8 +135,8 @@ class FNNDSC_hypothermia(base.FNNDSC):
         lst_clusterNodes = ['rc-drno', 'rc-russia', 'rc-thunderball',
                             'rc-goldfinger', 'rc-twice']
         str_hostname    = socket.gethostname()
-        if str_hostname not in lst_clusterNodes:
-            error.fatal(self, 'notClusterNode', 'Current hostname = %s' % str_hostname)
+        #if str_hostname not in lst_clusterNodes:
+            #error.fatal(self, 'notClusterNode', 'Current hostname = %s' % str_hostname)
 
         # Set the stages
         self._pipeline.stages_canRun(False)
@@ -342,17 +346,20 @@ if __name__ == "__main__":
             misc.mkdir(_str_outDir)
             str_prefixCmd = '( cd %s ; ' % (os.getcwd())
             log = stage.log()
-            log('Scheduling brain extraction for "%s"..\n' % (subj))
-            str_cmd = '/chb/users/rudolphpienaar/src/devel/hypothermia/bet.py --input %s --output %s/%s' % (_str_B0File, 
+            log('Scheduling brain extraction for "%s"...\n' % (subj))
+            str_cmd = 'bet.py --input %s --output %s/%s' % (_str_B0File, 
                                                          _str_outDir, _str_outFile)
             #cluster = crun.crun_mosix(cmdPrefix=str_prefixCmd)
-            cluster = crun.crun_mosix()
+            #cluster = crun.crun_mosix()
+            cluster = crun.crun()
             #str_ccmd = cluster.echo(True)
             #log(str_ccmd)
-            cluster.echo(True)
-            cluster.echoStdOut()
-            cluster.detach()
-            cluster(str_cmd, waitForChild=False)
+            cluster.echo(False)
+            cluster.echoStdOut(False)
+            cluster.detach(False)
+            cluster(str_cmd, waitForChild=True, stdoutflush=True, stderrflush=True)
+            if cluster.exitCode():
+                error.fatal(pipe_hypothermia, 'stageExec', cluster.stderr())
             os.chdir(str_cwd)
         return True
     stage0.def_stage(f_stage0callback, subj=args.l_subj, obj=stage0)
@@ -394,18 +401,21 @@ if __name__ == "__main__":
             _str_outFile = 'asl2b0.nii'
             misc.mkdir(_str_outDir)
             log = stage.log()
-            log('Scheduling coreg for "%s: ASL->B0"..\n' % (subj))
+            log('Scheduling coreg for "%s: ASL->B0"...\n' % (subj))
             str_cmd = 'coreg.py --input %s --ref %s --out %s/%s' % (
                                                         _str_ASLFile,
                                                         _str_B0File, 
                                                         _str_outDir, 
                                                         _str_outFile)
-            cluster = crun.crun_mosix()
-            str_ccmd = cluster.echo(True)
-            log(str_ccmd)
-            cluster.echoStdOut()
-            cluster.detach()
-            cluster(str_cmd, waitForChild=False)
+            cluster = crun.crun()
+            #str_ccmd = cluster.echo(True)
+            #log(str_ccmd)
+            cluster.echo(False)
+            cluster.echoStdOut(False)
+            cluster.detach(False)
+            cluster(str_cmd, waitForChild=True, stdoutflush=True, stderrflush=True)
+            if cluster.exitCode():
+                error.fatal(pipe_hypothermia, 'stageExec', cluster.stderr())
             os.chdir(str_cwd)
         return True
     stage1.def_stage(f_stage1callback, subj=args.l_subj, obj=stage1)
@@ -431,6 +441,9 @@ if __name__ == "__main__":
     def f_stage2callback(**kwargs):
         str_cwd         =  os.getcwd()
         lst_subj        = []
+        for key, val in kwargs.iteritems():
+            if key == 'subj':   lst_subj        = val
+            if key == 'obj':    stage           = val
         for subj in lst_subj:
             # find the relevant input files in each <subj> dir
             os.chdir(subj)
@@ -444,18 +457,19 @@ if __name__ == "__main__":
             _str_outFile = 'asl2b0.nii'
             misc.mkdir(_str_outDir)
             log = stage.log()
-            log('Scheduling coreg for "%s: ASL->B0"..\n' % (subj))
+            log('Scheduling masconorm for "%s: ASL"..\n' % (subj))
             str_cmd = 'masconorm.py --input %s/asl2b0.nii.gz --mask %s/b0Brain_mask.nii.gz --outStem %s/asl' % (
                                                         _str_outDir,
                                                         _str_outDir,
                                                         _str_outDir)
-            cluster = crun.crun_mosix()
-            str_ccmd = cluster.echo(True)
-            str_ccmd
-            log(str_ccmd)
-            cluster.echoStdOut()
-            cluster.detach()
-            cluster(str_cmd, waitForChild=False)
+            #cluster = crun.crun_mosix()
+            cluster = crun.crun()
+            cluster.echo(False)
+            cluster.echoStdOut(False)
+            cluster.detach(False)
+            cluster(str_cmd, waitForChild=True, stdoutflush=True, stderrflush=True)
+            if cluster.exitCode():
+                error.fatal(pipe_hypothermia, 'stageExec', cluster.stderr())
             os.chdir(str_cwd)
         return True
     stage2.def_stage(f_stage2callback, subj=args.l_subj, obj=stage2)
@@ -481,12 +495,15 @@ if __name__ == "__main__":
     def f_stage3callback(**kwargs):
         str_cwd         =  os.getcwd()
         lst_subj        = []
+        for key, val in kwargs.iteritems():
+            if key == 'subj':   lst_subj        = val
+            if key == 'obj':    stage           = val
         for subj in lst_subj:
             # find the relevant input files in each <subj> dir
             os.chdir(subj)
-            l_ADC       = misc.find(_str_asl)
+            l_ADC       = misc.find(_str_adc)
             if not l_ADC: error.fatal(pipe_hypothermia, 'noADC')
-            _str_ADCFile = l_ASL[0]
+            _str_ADCFile = l_ADC[0]
             _str_outDir  = 'outDir'
             misc.mkdir(_str_outDir)
             log = stage.log()
@@ -495,11 +512,11 @@ if __name__ == "__main__":
                                                         _str_ADCFile,
                                                         _str_outDir,
                                                         _str_outDir)
-            cluster = crun.crun_mosix()
+            cluster = crun.crun()
             cluster.echo(False)
-            cluster.echoStdOut()
-            cluster.detach()
-            cluster(str_cmd, waitForChild=False)
+            cluster.echoStdOut(False)
+            cluster.detach(False)
+            cluster(str_cmd, waitForChild=True, stdoutflush=True, stderrflush=True)
             os.chdir(str_cwd)
         return True
     stage3.def_stage(f_stage3callback, subj=args.l_subj, obj=stage3)
