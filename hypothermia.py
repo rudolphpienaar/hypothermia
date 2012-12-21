@@ -523,12 +523,56 @@ if __name__ == "__main__":
     stage3.def_postconditions(f_blockOnScheduledJobs, obj=stage3,
                               blockProcess    = 'masconorm.py')
                               
+                              
+    #
+    # Stage 4
+    # This is a callback stage, spawning multiple MatLAB analyses
+    #
+    # PRECONDITIONS:
+    #
+    stage4 = stage.Stage(
+                        name            = 'basac_drive',
+                        fatalConditions = True,
+                        syslog          = True,
+                        logTo           = 'hypothermia-basac_drive.log',
+                        logTee          = True
+                        )
+    
+    stage4.def_preconditions(stage3.def_postconditions()[0], **stage3.def_postconditions()[1])
+    def f_stage4callback(**kwargs):
+        str_cwd         =  os.getcwd()
+        lst_subj        = []
+        for key, val in kwargs.iteritems():
+            if key == 'subj':   lst_subj        = val
+            if key == 'obj':    stage           = val
+        for subj in lst_subj:
+            # find the relevant input files in each <subj> dir
+            _str_outDir  = 'outDir'
+            misc.mkdir(_str_outDir)
+            os.chdir("%s/outDir" % subj)
+            log = stage.log()
+            log('Scheduling MatLAB basac analysis for subject "%s"..\n' % (subj))
+            str_cmd = 'eval "/chb/pices/arch/x86_64-Linux/bin/matlab -nodesktop -nosplash -nojvm -r \"c = basac_drive(%s); exit\""' % (
+                        os.getcwd()
+                        )
+            cluster = crun.crun()
+            cluster.echo(False)
+            cluster.echoStdOut(False)
+            cluster.detach(False)
+            cluster(str_cmd, waitForChild=True, stdoutflush=True, stderrflush=True)
+            os.chdir(str_cwd)
+        return True
+    stage4.def_stage(f_stage4callback, subj=args.l_subj, obj=stage4)
+    stage4.def_postconditions(f_blockOnScheduledJobs, obj=stage4,
+                              blockProcess    = 'basac_process')
+                              
     
     # Add all the stages to the pipeline  
     pipe_hypothermia.stage_add(stage0)
     pipe_hypothermia.stage_add(stage1)
     pipe_hypothermia.stage_add(stage2)
     pipe_hypothermia.stage_add(stage3)
+    pipe_hypothermia.stage_add(stage4)
 
     # Initialize the pipeline and ... run!
     pipe_hypothermia.initialize()
