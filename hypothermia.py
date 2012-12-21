@@ -556,7 +556,7 @@ if __name__ == "__main__":
                         os.getcwd()
                         )
             cluster = crun.crun()
-            cluster.echo(False)
+            cluster.echo(True)
             cluster.echoStdOut(False)
             cluster.detach(False)
             cluster(str_cmd, waitForChild=True, stdoutflush=True, stderrflush=True)
