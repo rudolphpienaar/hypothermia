@@ -551,12 +551,12 @@ if __name__ == "__main__":
             misc.mkdir(_str_outDir)
             os.chdir("%s/outDir" % subj)
             log = stage.log()
-            log('Scheduling MatLAB basac analysis for subject "%s"..\n' % (subj))
-            str_cmd = 'eval "/chb/pices/arch/x86_64-Linux/bin/matlab -nodesktop -nosplash -nojvm -r \"c = basac_drive(%s); exit\""' % (
+            log('Scheduling MatLAB basac analysis for subject "%s"...\n' % (subj))
+            str_cmd = 'eval "/chb/pices/arch/x86_64-Linux/bin/matlab -nodesktop -nosplash -nojvm -r \\\"c = basac_drive(\'%s\'); exit\\\"" |tee basac_process.log' % (
                         os.getcwd()
                         )
             cluster = crun.crun()
-            cluster.echo(True)
+            cluster.echo(False)
             cluster.echoStdOut(False)
             cluster.detach(False)
             cluster(str_cmd, waitForChild=True, stdoutflush=True, stderrflush=True)
